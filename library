@@ -1,0 +1,41 @@
+# буду записывать интересные решения и код сюда
+
+ # заполнение столбца индексацией по условию: 
+ df.loc[(df['column'] == X, 'column2') = Y]
+ _________________________________________________________
+ # функция по сравнению значений в двух массивах:
+ 
+ def error_count(array1, array2):
+    count = 0
+    for i in range(len(array1)):
+        if array1[i] != array2[i]:
+            count += 1
+    return count
+
+print("Ошибок:", error_count(test_target, test_predictions))
+_________________________________________________________
+
+# цикл для проверки максимальной глубины исследования в модели: 
+
+for i in range(1,6):
+    model = DecisionTreeClassifier(max_depth=i, random_state = 12345)
+    model.fit(features_train, target_train)
+    predictions_valid = model.predict(features_valid)
+    accuracy = accuracy_score(target_valid, predictions_valid)
+    print('max_depth =', i, ':', accuracy)
+_________________________________________________________
+
+# цикл в функции для перемножения чисел внутри себя: 
+
+def mse(answers, predictions):
+    total = 0
+    for i in range(len(answers)):
+        total += (answers[i] - predictions[i])**2 # < прибавьте квадрат ошибки >
+    result = total/len(answers) # < поделите сумму на количество объектов >
+    return result
+    
+answers = [623, 253, 150, 237]
+predictions = [649, 253, 370, 148]
+
+print(mse(answers, predictions))
+_________________________________________________________
