@@ -82,4 +82,17 @@ for i in taxies:
     taxi_distances.append(dist)
 index=np.array(taxi_distances)
 print(taxies[np.array(taxi_distances).argmin()])
+_________________________________________________________
+# поиск минимального элемента по индексу
+preference_index = 12
+preference_vector = df_realty.loc[preference_index].values
 
+distances = []
+
+for i in range(df_realty['комнаты'].count()):
+    x = df_realty.loc[12].values
+    distances.append(distance.euclidean(x, df_realty.loc[i].values))
+#val, idx = min((val, idx) for (idx, val) in enumerate(distances))
+#best_index = idx
+best_index = np.array(distances).argsort()[1] 
+#print(best_index)
