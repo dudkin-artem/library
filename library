@@ -96,3 +96,20 @@ for i in range(df_realty['комнаты'].count()):
 #best_index = idx
 best_index = np.array(distances).argsort()[1] 
 #print(best_index)
+
+_________________________________________________________
+функция ближайших соседей: 
+
+def nearest_neighbor_predict(train_features, train_target, new_features):
+    dist_list = []
+    for i in range(train_features.shape[0]):
+        dist_list.append(distance.euclidean(new_apartment,train_features.loc[i]))
+    best_index = np.array(dist_list).argsort()[0]
+    answer = train_target[best_index]
+    return answer
+
+train_features = df_train.drop('кондиционер', axis=1)
+train_target = df_train['кондиционер']
+new_apartment = np.array([2, 51.0, 8.2, 35.9, 5, 5])
+prediction = nearest_neighbor_predict(train_features, train_target, new_apartment)
+print(prediction)
