@@ -58,6 +58,14 @@ _________________________________________________________
 
 result=list(set(Ans) & set(Word))
 сюда же - разность
+absent_columns = list(set(data_train.columns) - set(data_test.columns))
+absent_columns.sort()
+_________________________________________________________
+# поиск нужного куска текста в названии колонки фрейма
+
+au = data_full.columns
+au_list = au.str.contains(r'au')
+au_data = data_full.columns[au_list]
 _________________________________________________________
 # цикл чтобы убрать все цифры в строке:
 
