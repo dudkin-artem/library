@@ -3,6 +3,16 @@
  # заполнение столбца индексацией по условию: 
  df.loc[(df['column'] == X, 'column2') = Y]
  _________________________________________________________
+
+# изменение типа данных в столбцах таблицы "оптом":
+caterigorial = []
+for i in data.columns.tolist():
+    if data[i].dtypes == 'object':
+        caterigorial.append(data[i].name)
+for i in caterigorial:
+    data[i] = data[i].astype('category')
+ _________________________________________________________
+ 
  # функция по сравнению значений в двух массивах:
  
  def error_count(array1, array2):
