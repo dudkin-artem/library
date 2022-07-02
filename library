@@ -137,3 +137,13 @@ train_target = df_train['кондиционер']
 new_apartment = np.array([2, 51.0, 8.2, 35.9, 5, 5])
 prediction = nearest_neighbor_predict(train_features, train_target, new_apartment)
 print(prediction)
+
+_________________________________________________________
+# запуск грид-серч:
+
+parameters = { "n_estimators" : range(1, 10),
+               "max_depth": range(1,10),
+}
+model = GridSearchCV(model, parameters, cv=10)
+model.fit(x_train, y_train)
+grid.best_params_
