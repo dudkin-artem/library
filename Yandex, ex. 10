@@ -1,0 +1,281 @@
+### Проект 9: Определение стоимости автомобилей
+
+Цель исследования: отобрать модель ML обученную градиентным бустингом для интеграции в приложение для прогнозирования цен на автомобили. 
+
+Критерии оценки: скорость обучения, качество прогноза. 
+
+Критерии качества модели: метрика rmse.
+
+План работы: 
+
+0. Предобработка данных
+1. Обучение моделей LGBMRegressor, catboost и без бустинга. 
+2. Выводы о качестве работы моделей, рекомендации к использованию. 
+
+#### Шаг 0. Предобработка данных
+
+import pandas as pd
+import seaborn as sb
+import numpy as np
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
+import lightgbm as lgb
+from lightgbm import LGBMRegressor 
+from sklearn.metrics import mean_squared_error
+from catboost import CatBoostRegressor
+from numpy import mean
+from numpy import std
+from sklearn.datasets import make_regression
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import RepeatedKFold
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import OrdinalEncoder
+
+data = pd.read_csv('/Users/artem/Desktop/Работы Юпитер/Проект 10 - градиентный бустинг/autos.csv')
+data.info() # осмотр таблицы
+
+x = list(data.columns) # меняем регистр в столбцах для удобной работы
+for i in range(len(x)):
+    x[i] = x[i].lower()
+data.columns = x
+
+# замена формата дат
+data['datecrawled'] = pd.to_datetime(data['datecrawled'], format='%Y-%m-%dT%H:%M:%S')
+data['datecreated'] = pd.to_datetime(data['datecreated'], format='%Y-%m-%dT%H:%M:%S')
+data['lastseen'] = pd.to_datetime(data['lastseen'], format='%Y-%m-%dT%H:%M:%S')
+
+# оцениваем качество данных
+data['price'].describe() # есть нули
+print(data.query('price == 0')['price'].count() / data['price'].count()) # три процента нулей от общего числа 
+
+# цена - целевой признак, без нее данные бесполезны, удаляем
+data = data.drop((data.query('price == 0').index), axis=0)
+
+data['price'].isna().sum() # nan нет
+
+data['registrationyear'].value_counts()
+data['registrationyear'].describe() # видим тысячный год
+data.query('registrationyear == 1000')['registrationyear'].count() # 31 строка с годом 1000
+data = data.drop(data.query('registrationyear == 1000').index, axis = 0) # удаляем
+
+# узнаем данные, которые на 2 квартиля выше/ниже
+x = np.mean(data['registrationyear'])
+y = np.std(data['registrationyear'])
+z = x-2*y
+z_z = x+2*y
+
+# список выбросов ниже 2 квартилей
+data.query('registrationyear < @z')
+# построим диаграмму рассеяния по ним, видим, что в выборке только выбросы
+data.query('registrationyear < @z').plot(kind='scatter', y='registrationyear', x='price')
+# можно удалить:
+data = data.drop(data.query('registrationyear < @z').index, axis=0)
+
+# список выбросов выше 2 квартилей
+data.query('registrationyear > @z_z')
+# построим диаграмму рассеяния по ним, видим, что в выборке только выбросы
+data.query('registrationyear > @z_z').plot(kind='scatter', y='registrationyear', x='price')
+# можно удалить:
+data = data.drop(data.query('registrationyear > @z_z').index, axis=0)
+
+# для нормальной работы бустинга с датой, разобьем на день/месяц/год и тп:
+
+data['datecrawled_w'] = data['datecrawled'].dt.weekday 
+data['datecrawled_m'] = data['datecrawled'].dt.month
+data['datecrawled_y'] = data['datecrawled'].dt.year
+
+# заполняем пропуски на unknown
+data = data.fillna('unknown')
+
+# формируем перечень категориальных признаков
+
+# изменим тип данных на category - нужно для бустинга
+
+# понятно, что можно и вручную, но тут важна масштабируемость: этот метод можно растянуть на таблицу с любым количеством столбцов.
+
+caterigorial = []
+for i in data.columns.tolist():
+    if data[i].dtypes == 'object':
+        caterigorial.append(data[i].name)
+for i in caterigorial:
+    data[i] = data[i].astype('category')
+    
+# делим таблицу на признаки
+x = data.drop('price', axis=1)
+y = data['price']
+
+# формируем тренировочную, валидационную и тестовые выборки:
+x_train, x_test, y_train, y_test = train_test_split(x,y, test_size=0.4, random_state=12345)
+x_test, x_test_valid, y_test, y_test_valid = train_test_split(x_test,y_test, test_size=0.5, random_state=12345)
+
+# проверим, соблюдена ли размерность
+print(x_test.shape)    
+print(y_test.shape)
+print(x_train.shape) 
+print(y_train.shape)
+print(x_test_valid.shape) 
+print(y_test_valid.shape)
+# все равно
+
+clf = LGBMRegressor(
+            boosting_type='gbdt',
+            nthread=4,
+            n_estimators=10000,
+            learning_rate=0.005,
+            num_leaves= 45,
+            colsample_bytree= 0.8,
+            subsample= 0.4,
+            subsample_freq=1,
+            max_depth= 20,
+            reg_alpha= 0.5,
+            reg_lambda=0.5,
+            min_split_gain=0.04,
+            min_child_weight=.05,
+            random_state=0,
+            silent=-1,
+            verbose=-1)
+
+#clf.fit(x_train, y_train, eval_set=[(x_test_valid, y_test_valid)], eval_metric= 'rmse', verbose= 1000, early_stopping_rounds= 200)
+#rmse = mean_squared_error(y_test, clf.predict(x_test))**0.5
+
+clf.fit(x_train, y_train, eval_set=[(x_test_valid, y_test_valid)], eval_metric= 'rmse', verbose= 1000, early_stopping_rounds= 200)
+rmse = mean_squared_error(y_test_valid, clf.predict(x_test_valid))**0.5
+
+print('Эффективность бустинга на модели gbdt: RMSE = ', rmse) # 1599.0736837335241
+
+# напишем бустер LGBMRegressor
+
+train_dataset = lgb.Dataset(x_train, y_train)
+test_dataset = lgb.Dataset(x_test_valid, y_test_valid)
+
+booster = lgb.train({"objective": "regression"},
+                    train_set=train_dataset, valid_sets=(test_dataset),
+                    num_boost_round=1000, verbose_eval=False, 
+                   categorical_feature = caterigorial)
+rmse = mean_squared_error(y_test_valid, booster.predict(x_test_valid))**0.5
+print('Эффективность бустинга бустером lgb: RMSE = ', rmse) # 1594.6617806856582
+
+# проверяем catboost
+
+cat = CatBoostRegressor(loss_function='RMSE', iterations=1000, depth=10)
+cat.fit(x_train,y_train,verbose=False,cat_features=caterigorial)
+rmse = mean_squared_error(y_test_valid, cat.predict(x_test_valid))**0.5
+print('Эффективность бустинга на модели catboost: RMSE = ', rmse) # 1603.9174009657966
+
+# здесь и ниже тестируем LGBMRegressor с разным типом моделей
+
+rf = LGBMRegressor(
+            boosting_type='rf',
+            nthread=4,
+            n_estimators=1000,
+            learning_rate=0.005,
+            num_leaves= 45,
+            colsample_bytree= 0.8,
+            subsample= 0.4,
+            subsample_freq=1,
+            max_depth= 20,
+            reg_alpha= 0.5,
+            reg_lambda=0.5,
+            min_split_gain=0.04,
+            min_child_weight=.05,
+            random_state=0,
+            silent=-1,
+            verbose=-1)
+
+rf.fit(x_train, y_train, eval_set=[(x_test_valid, y_test_valid)], eval_metric= 'rmse', verbose= 200, early_stopping_rounds= 200)
+rmse = mean_squared_error(y_test_valid, rf.predict(x_test_valid))**0.5
+print('Эффективность бустинга на модели rt: RMSE = ', rmse) # 2089.067960339997
+
+%%time
+1 + 1
+dart = LGBMRegressor(
+            boosting_type='dart',
+            nthread=4,
+            n_estimators=1000,
+            learning_rate=0.005,
+            num_leaves= 45,
+            colsample_bytree= 0.8,
+            subsample= 0.4,
+            subsample_freq=1,
+            max_depth= 20,
+            reg_alpha= 0.5,
+            reg_lambda=0.5,
+            min_split_gain=0.04,
+            min_child_weight=.05,
+            random_state=0,
+            silent=-1,
+            verbose=-1)
+
+dart.fit(x_train, y_train, eval_set=[(x_test_valid, y_test_valid)], eval_metric= 'rmse', verbose= 100)
+rmse = mean_squared_error(y_test_valid, dart.predict(x_test_valid))**0.5
+print('Эффективность бустинга на модели dart: RMSE = ', rmse) # 1635.0378509585166
+
+# проверим rmse на обычной модели без градиентного бустинга: 
+model = RandomForestRegressor()
+df = data.copy()
+
+caterigorial_df = []
+for i in df.columns.tolist():
+    if df[i].dtypes == 'category':
+        df[i] = df[i].astype('object')        
+        caterigorial_df.append(data[i].name)
+
+print(caterigorial_df)
+# делим таблицу на признаки
+dfx = df.drop('price', axis=1)
+dfy = df['price']
+
+# формируем тренировочную, валидационную и тестовые выборки:
+dfx_train, dfx_test, dfy_train, dfy_test = train_test_split(dfx,dfy, test_size=0.4, random_state=12345)
+dfx_test, dfx_test_valid, dfy_test, dfy_test_valid = train_test_split(dfx_test,dfy_test, test_size=0.5, random_state=12345)
+
+
+# работаем с энкодером:
+
+enc = OrdinalEncoder()
+enc.fit(dfx[caterigorial_df])
+
+dfx_train[caterigorial_df] = enc.transform(dfx_train[caterigorial_df])
+dfx_test_valid[caterigorial_df] = enc.transform(dfx_test_valid[caterigorial_df])
+dfx_test[caterigorial_df] = enc.transform(dfx_test[caterigorial_df])
+ 
+# пробуем случайный лес 
+model = RandomForestRegressor(n_estimators=50, max_depth=11, random_state=12345)
+model.fit(dfx_train, dfy_train)
+rmse = mean_squared_error(dfy_test_valid, model.predict(dfx_test_valid))**0.5
+print('Эффективность без бустинга на модели rf: RMSE = ', rmse) # 1864.6757730945833
+
+# тесты: 
+rmse = mean_squared_error(y_test, clf.predict(x_test))**0.5
+print('Эффективность бустинга на модели gbdt: RMSE = ', rmse)  # 1599.0736837335241
+rmse = mean_squared_error(y_test, booster.predict(x_test))**0.5
+print('Эффективность бустинга бустером lgb: RMSE = ', rmse) # 1594.6617806856582
+rmse = mean_squared_error(y_test, cat.predict(x_test))**0.5
+print('Эффективность бустинга на модели catboost: RMSE = ', rmse) # 1603.9174009657966
+rmse = mean_squared_error(y_test, rf.predict(x_test))**0.5
+print('Эффективность бустинга на модели rt: RMSE = ', rmse) # 2089.067960339997
+rmse = mean_squared_error(y_test, dart.predict(x_test))**0.5
+print('Эффективность бустинга на модели dart: RMSE = ', rmse) # 1635.0378509585166
+rmse = mean_squared_error(dfy_test, model.predict(dfx_test))**0.5
+print('Эффективность без бустинга на модели rf: RMSE = ', rmse) # 1864.6757730945833
+
+#### 2. Выводы
+Эффективность бустинга на модели gbdt: RMSE =  1614.6659675209842, время обучения: 24min 58s, прогнозирования: 1min 45s
+
+Эффективность бустинга бустером lgb: RMSE =  1610.692421525234, время обучения: 24min 58s, прогнозирования: total: 2.67 s
+
+Эффективность бустинга на модели catboost: RMSE =  1614.6969400836658, время обучения: 3min 44s, прогнозирования: total: 1.08 s
+
+Эффективность бустинга на модели rt: RMSE =  2119.893528060286, время обучения: 30.1 s, прогнозирования: 415 ms
+
+Эффективность бустинга на модели dart: RMSE =  2894.4908771406617, время обучения: ~ 48 минут, прогнозирования: 5min 14s
+
+Эффективность без бустинга на модели rf: RMSE =  1902.567755988174, время обучения: 43min 6s, прогнозирования: 865 ms
+
+
+Наибольшую эффективность показал LGBMRegressor на модели dart на модели dart, но модель неадекватно долго обучается.
+
+По соотношению время/качество лучше всего работает catboost. Дальше с просадкой по времени обучения почти в 8 раз идут LGBMRegressor на модели gbdt и бустер.
+
+Для использования в программе лучше всего себя покажет catboost. 
