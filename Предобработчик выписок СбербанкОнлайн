@@ -1,0 +1,37 @@
+# предобработчик расширенных выписок из системы сбербан.онлайн для бизнеса; 
+# основная задача алгоритма - предоставлять данные о текущих кредитовых оборотах организации, каким контрагентам сколько денег отправлено с начала месяца;
+# алгоритм нужен для контроля за выполнением требований банка о нужном количестве контрагентов;
+# если не поддерживать структуру поставщиков товаров/услуг в нужном банку размере, банк аннулирует либо сокращает лимиты по овердрафтному кредитованию;
+# с этой проблемой мы столкнулись в мае 2022 года, резкое снижение объемов доступных средств создало много трудностей в ведении дел;
+
+# алгоритм работает с расширенной выпиской в формате excel, никакой предобработки вручную выписка не требует. 
+# итогом работы алгоритма будет таблица компаний-поставщиков, которым вы отправили наибольшее количество средств в запрошенном периоде. 
+# объемы выражены как в процентах от общего числа кредитовых оборотах, так и в абсолютных цифрах.
+
+______________________
+import pandas as pd
+from tqdm import notebook
+import re
+import nltk
+
+data = pd.read_excel('путь к файлу')
+new_cols = ['column_0', 'column_1','column_2','column_3','column_4','column_5','column_6','column_7','column_8','column_9','column_10','column_11','column_12','column_13','column_15','column_16','column_17','column_18','column_19','column_20','column_21']
+data.columns = new_cols
+
+# column_4 - покупатели
+# column_8 - поставщики
+# column_9 - суммы по поставщикам
+
+for i in notebook.tqdm(range(len(data['column_8']))):
+    text = str(data.loc[i, 'column_8'])
+    text = re.sub(r'[^а-яА-ЯЁё]', ' ', text)
+    text = text.split()
+    text = " ".join(text)
+    data.loc[i, 'column_8'] = text
+    
+data = data.dropna(axis=0, how='all', subset='column_15').reset_index(drop=True)
+data['column_9'] = data['column_9'].drop([0,1], axis=0)
+x = data['column_9'].sum()
+pivot_table = data.pivot_table(index='column_8', values='column_9', aggfunc='sum').reset_index().drop(0, axis=0).sort_values(by='column_9', ascending=False)
+pivot_table['procent'] = pivot_table['column_9']/x
+pivot_table.head(7)
