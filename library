@@ -147,3 +147,8 @@ parameters = { "n_estimators" : range(1, 10),
 model = GridSearchCV(model, parameters, cv=10)
 model.fit(x_train, y_train)
 grid.best_params_
+_________________________________________________________
+# цикл для сортировки - работа не через query, а через loc
+
+for i in range(len(list(df['date'].unique()))):
+    df.loc[(df.loc[:, 'long'] > "0:05") & (df.loc[:, 'date'] == df['date'].unique()[i])]
