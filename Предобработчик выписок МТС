@@ -67,7 +67,6 @@ for i in range(len(data['number'])):
 data = data.reset_index(drop=True)
 
 data['time'] = pd.to_datetime(data['time'], format='%H:%M:%S')
-data['time'] = pd.to_datetime(data['time'])
 data['hour'] = data['time'].dt.hour
 data['time'] = data['time'].dt.time
 data['date'] = pd.to_datetime(data['date'], format='%d.%m.%Y')
