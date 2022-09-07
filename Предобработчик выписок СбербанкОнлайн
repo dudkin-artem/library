@@ -31,16 +31,10 @@ for i in notebook.tqdm(range(len(data['column_8']))):
     
 data = data.dropna(axis=0, how='all', subset='column_15').reset_index(drop=True)
 data['column_9'] = data['column_9'].drop([0,1], axis=0)
-
 df_new = data.drop(data[data['column_8'] == "ПАО СБЕРБАНК"].index)
-df_new = data.drop(data[data['column_8'] == "ПАО СБЕРБАНК"].index)
-
 pivot_table_2 = df_new.pivot_table(index='column_8', values='column_9', aggfunc='sum').reset_index().drop(0, axis=0).sort_values(by='column_9', ascending=False)
-
 x = pivot_table_2['column_9'].sum()
-
 pivot_table_2['column_9'] = pivot_table_2['column_9'].astype('float64')
 pivot_table_2['procent'] = pivot_table_2['column_9']/x
-
-display(pivot_table_2)
-display('Сумма по трем крупнейшим контрагентам (не должна быть больше 80%): ', pivot_table_2['procent'].head(3).sum())
+pivot_table_2
+print('Сумма по трем крупнейшим контрагентам (не должна быть больше 80%): ', round(pivot_table_2['procent'].head(3).sum(), 2))
