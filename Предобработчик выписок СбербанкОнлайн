@@ -31,7 +31,10 @@ for i in notebook.tqdm(range(len(data['column_8']))):
     
 data = data.dropna(axis=0, how='all', subset='column_15').reset_index(drop=True)
 data['column_9'] = data['column_9'].drop([0,1], axis=0)
-x = data['column_9'].sum()
-pivot_table = data.pivot_table(index='column_8', values='column_9', aggfunc='sum').reset_index().drop(0, axis=0).sort_values(by='column_9', ascending=False)
-pivot_table['procent'] = pivot_table['column_9']/x
-pivot_table.head(7)
+
+df_new = data.drop(data[data['column_8'] == "ПАО СБЕРБАНК"].index)
+pivot_table_2 = df_new.pivot_table(index='column_8', values='column_9', aggfunc='sum').reset_index().drop(0, axis=0).sort_values(by='column_9', ascending=False)
+x = pivot_table_2['column_9'].sum()
+pivot_table_2['column_9'] = pivot_table_2['column_9'].astype('float64')
+pivot_table_2['procent'] = pivot_table_2['column_9']/x
+pivot_table_2
